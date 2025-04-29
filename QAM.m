@@ -28,8 +28,6 @@ qamTable = [-3 -1 +3 +1];  % 4-PAM levels
 I = qamTable(bi2de(symbols(:,1:2),'left-msb') + 1);
 Q = qamTable(bi2de(symbols(:,3:4),'left-msb') + 1);
 
-%% Step 2: Transmit and Receive System (Block diagram not coded, visual only)
-
 %% Step 4: Add AWGN at various SNRs
 SNR_dBs = [0, 3, 7];
 vi_list = 10.^(-SNR_dBs/10);  % Variances for AWGN
@@ -78,7 +76,6 @@ for p_idx = 1:2
         Q_samples = Q_filtered(sample_indices);
 
         % Detection (thresholding)
-        levels = [-2 -1 0 1 2];
         pam_levels = [-3 -1 1 3];
         I_detected = pam_levels(knnsearch(pam_levels.', I_samples.'));
         Q_detected = pam_levels(knnsearch(pam_levels.', Q_samples.'));
@@ -92,31 +89,38 @@ for p_idx = 1:2
         rx_bits = rx_bits(1:length(bb));
         ber(p_idx, snr_idx) = sum(bb ~= rx_bits) / length(bb);
 
-        % Step 5: Eye diagram for I-branch (first 20 bits only, only once)
+        % Step 5: Eye diagram for I-branch (first 50 symbols)
         if snr_idx == 1
-            bits20 = bb(1:80); % 20 symbols = 80 bits
-            symbols20 = reshape(bits20, 4, []).';
-            I_20 = qamTable(bi2de(symbols20(:,1:2), 'left-msb') + 1);
-            I_up20 = upsample(I_20, samples_per_symbol);
-            I_shaped20 = conv(I_up20, pulse, 'same');
+            bits50 = bb(1:200); % 50 symbols = 200 bits
+            symbols50 = reshape(bits50, 4, []).';
+            I_50 = qamTable(bi2de(symbols50(:,1:2), 'left-msb') + 1);
+            I_up50 = upsample(I_50, samples_per_symbol);
+            I_shaped50 = conv(I_up50, pulse, 'same');
 
-            figure;
-            eyediagram(I_shaped20, 2*samples_per_symbol);
+            fig = figure;
+            eyediagram(I_shaped50, 2*samples_per_symbol);
             title(sprintf('Eye Diagram (%s pulse, SNR = %d dB)', pulse_names{p_idx}, snr_db));
+            drawnow; pause(0.1);
+            frame = getframe(fig);
+            imwrite(frame.cdata, sprintf('eye_%s_snr%d.jpg', lower(pulse_names{p_idx}), snr_db));
+            close(fig);
         end
 
-        % Step 6: Constellation diagram (first 1000 bits)
+        % Step 6: Constellation diagram (first 250 symbols)
         if snr_db < 10
-            figure;
-            scatter(I_samples(1:250), Q_samples(1:250), 'filled');
+            fig = figure;
+            scatter(I_samples(1:min(250,end)), Q_samples(1:min(250,end)), 'filled');
             title(sprintf('Constellation (%s pulse, SNR = %d dB)', pulse_names{p_idx}, snr_db));
             xlabel('I'); ylabel('Q'); axis equal; grid on;
+            drawnow; pause(0.1);
+            saveas(fig, sprintf('constellation_%s_snr%d.jpg', lower(pulse_names{p_idx}), snr_db));
+            close(fig);
         end
     end
 end
 
 %% Step 7: BER Plot
-figure;
+fig = figure;
 semilogy(SNR_dBs, ber(1,:), '-o', 'DisplayName', 'Square Pulse');
 hold on;
 semilogy(SNR_dBs, ber(2,:), '-s', 'DisplayName', 'Sinc Pulse');
@@ -125,6 +129,9 @@ xlabel('SNR (dB)');
 ylabel('Bit Error Rate (BER)');
 title('BER vs SNR');
 grid on;
+drawnow; pause(0.1);
+saveas(fig, 'ber_vs_snr.jpg');
+close(fig);
 
 %% Step 8: Bit Rate Calculation
 bitrate = 4 / T;  % 4 bits per symbol, 1 symbol per T seconds
