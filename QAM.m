@@ -89,22 +89,26 @@ for p_idx = 1:2
         rx_bits = rx_bits(1:length(bb));
         ber(p_idx, snr_idx) = sum(bb ~= rx_bits) / length(bb);
 
-        % Step 5: Eye diagram for I-branch (first 50 symbols)
-        if snr_idx == 1
-            bits50 = bb(1:200); % 50 symbols = 200 bits
-            symbols50 = reshape(bits50, 4, []).';
-            I_50 = qamTable(bi2de(symbols50(:,1:2), 'left-msb') + 1);
-            I_up50 = upsample(I_50, samples_per_symbol);
-            I_shaped50 = conv(I_up50, pulse, 'same');
+       % Step 5: Eye diagram for I-branch (first 50 symbols)
+if snr_idx == 1
+    bits50 = bb(1:200); % 50 symbols = 200 bits
+    symbols50 = reshape(bits50, 4, []).';
+    I_50 = qamTable(bi2de(symbols50(:,1:2), 'left-msb') + 1);
+    I_up50 = upsample(I_50, samples_per_symbol);
+    I_shaped50 = conv(I_up50, pulse, 'same');
 
-            fig = figure;
-            eyediagram(I_shaped50, 2*samples_per_symbol);
-            title(sprintf('Eye Diagram (%s pulse, SNR = %d dB)', pulse_names{p_idx}, snr_db));
-            drawnow; pause(0.1);
-            frame = getframe(fig);
-            imwrite(frame.cdata, sprintf('eye_%s_snr%d.jpg', lower(pulse_names{p_idx}), snr_db));
-            close(fig);
-        end
+    % Don't assign to fig; eyediagram uses its own figure
+    eyediagram(I_shaped50, 2 * samples_per_symbol);
+    title(sprintf('Eye Diagram (%s pulse, SNR = %d dB)', pulse_names{p_idx}, snr_db));
+    drawnow;
+
+    % Use gcf + exportgraphics for reliability
+    exportgraphics(gcf, sprintf('eye_%s_snr%d.png', lower(pulse_names{p_idx}), snr_db));
+
+    % Close the current figure properly
+    close(gcf);
+end
+
 
         % Step 6: Constellation diagram (first 250 symbols)
         if snr_db < 10
