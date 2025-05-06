@@ -1,8 +1,6 @@
 % PCS QAM Project
 % RUID: 208001821
 
-clc; clear all; close all;
-
 % Parameters
 T = 2;              
 A = 1;                
