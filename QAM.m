@@ -1,45 +1,45 @@
-%% PCS QAM Project 2025 – MATLAB Implementation
+% PCS QAM Project
 % RUID: 208001821
 
 clc; clear all; close all;
 
 % Parameters
-T = 2;                % Symbol duration in seconds
-A = 1;                % Pulse amplitude
-fc = 5;               % Carrier frequency (Hz)
-Ts = 0.05;            % Sampling time
-Fs = 1/Ts;            % Sampling frequency
+T = 2;              
+A = 1;                
+fc = 5;               
+Ts = 0.05;           
+Fs = 1/Ts;            
 samples_per_symbol = T / Ts;
-N = 100000;           % Number of bits
-rng(208001821);       % Set seed using RUID
+N = 100000;           
+rng(208001821); 
 
-%% Step 3: Generate bitstream
-bb = randi([0 1], 1, N);        % Random binary bits
+%Generate bitstream
+bb = randi([0 1], 1, N);        
 disp('First 10 bits:');
 disp(bb(1:10));
 
 % Group bits into 4-bit symbols for 16-QAM
 bb = bb(1:floor(length(bb)/4)*4);
-symbols = reshape(bb, 4, []).';  % Each row = 4 bits
+symbols = reshape(bb, 4, []).';
 
 % Map to 16-QAM (Gray Coding)
 M = 16;
-qamTable = [-3 -1 +3 +1];  % 4-PAM levels
+qamTable = [-3 -1 +3 +1];
 I = qamTable(bi2de(symbols(:,1:2),'left-msb') + 1);
 Q = qamTable(bi2de(symbols(:,3:4),'left-msb') + 1);
 
-%% Step 4: Add AWGN at various SNRs
+%Add AWGN at various SNRs
 SNR_dBs = [0, 3, 7];
-vi_list = 10.^(-SNR_dBs/10);  % Variances for AWGN
+vi_list = 10.^(-SNR_dBs/10); 
 
 % Define pulse shapes
 p_square = ones(1, samples_per_symbol) * A;
-p_sinc = A * sinc((0:Ts:T-Ts) - T/2);  % Main lobe width 2T
+p_sinc = A * sinc((0:Ts:T-Ts) - T/2);
 
 pulse_shapes = {p_square, p_sinc};
 pulse_names = {'Square', 'Sinc'};
 
-%% Processing for both pulse shapes
+% Processing for both pulse shapes
 for p_idx = 1:2
     pulse = pulse_shapes{p_idx};
     pulse_energy = sum(pulse.^2);
@@ -89,9 +89,9 @@ for p_idx = 1:2
         rx_bits = rx_bits(1:length(bb));
         ber(p_idx, snr_idx) = sum(bb ~= rx_bits) / length(bb);
 
-        % Eye diagram for snr_idx == 1 (shown as ∞ dB)
+        % Eye diagram for snr_idx == 1
         if snr_idx == 1
-            bits50 = bb(1:200); % 50 symbols = 200 bits
+            bits50 = bb(1:200);
             symbols50 = reshape(bits50, 4, []).';
             I_50 = qamTable(bi2de(symbols50(:,1:2), 'left-msb') + 1);
             I_up50 = upsample(I_50, samples_per_symbol);
@@ -125,7 +125,7 @@ for p_idx = 1:2
     end
 end
 
-%% Step 6.5: Constellation Plot for SNR = ∞ dB (no noise)
+%Constellation Plot for SNR = ∞ dB (no noise)
 for p_idx = 1:2
     pulse = pulse_shapes{p_idx};
     pulse_energy = sum(pulse.^2);
@@ -166,7 +166,7 @@ for p_idx = 1:2
     close(fig);
 end
 
-%% Step 7: BER Plot
+%BER Plot
 fig = figure;
 semilogy(SNR_dBs, ber(1,:), '-o', 'DisplayName', 'Square Pulse');
 hold on;
@@ -180,6 +180,6 @@ drawnow; pause(0.1);
 saveas(fig, 'ber_vs_snr.jpg');
 close(fig);
 
-%% Step 8: Bit Rate Calculation
+%Bit Rate Calculation
 bitrate = 4 / T;  % 4 bits per symbol, 1 symbol per T seconds
 fprintf('Bit Rate of the system: %.2f bits/sec\n', bitrate);
