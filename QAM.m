@@ -89,28 +89,30 @@ for p_idx = 1:2
         rx_bits = rx_bits(1:length(bb));
         ber(p_idx, snr_idx) = sum(bb ~= rx_bits) / length(bb);
 
-       % Step 5: Eye diagram for I-branch (first 50 symbols)
-if snr_idx == 1
-    bits50 = bb(1:200); % 50 symbols = 200 bits
-    symbols50 = reshape(bits50, 4, []).';
-    I_50 = qamTable(bi2de(symbols50(:,1:2), 'left-msb') + 1);
-    I_up50 = upsample(I_50, samples_per_symbol);
-    I_shaped50 = conv(I_up50, pulse, 'same');
+        % Eye diagram for snr_idx == 1 (shown as ∞ dB)
+        if snr_idx == 1
+            bits50 = bb(1:200); % 50 symbols = 200 bits
+            symbols50 = reshape(bits50, 4, []).';
+            I_50 = qamTable(bi2de(symbols50(:,1:2), 'left-msb') + 1);
+            I_up50 = upsample(I_50, samples_per_symbol);
 
-    % Don't assign to fig; eyediagram uses its own figure
-    eyediagram(I_shaped50, 2 * samples_per_symbol);
-    title(sprintf('Eye Diagram (%s pulse, SNR = %d dB)', pulse_names{p_idx}, snr_db));
-    drawnow;
+            % Zero-padding
+            pad_len = length(pulse) - 1;
+            I_up50_padded = [zeros(1, pad_len), I_up50, zeros(1, pad_len)];
+            I_shaped50_full = conv(I_up50_padded, pulse, 'full');
+            center_start = pad_len + 1;
+            center_end = center_start + length(I_up50) - 1;
+            I_shaped50 = I_shaped50_full(center_start:center_end);
 
-    % Use gcf + exportgraphics for reliability
-    exportgraphics(gcf, sprintf('eye_%s_snr%d.png', lower(pulse_names{p_idx}), snr_db));
+            % Eye diagram
+            eyediagram(I_shaped50, 2 * samples_per_symbol);
+            title(sprintf('Eye Diagram (%s pulse, SNR = ∞ dB)', pulse_names{p_idx}));
+            drawnow;
+            exportgraphics(gcf, sprintf('eye_%s_snrInf.png', lower(pulse_names{p_idx})));
+            close(gcf);
+        end
 
-    % Close the current figure properly
-    close(gcf);
-end
-
-
-        % Step 6: Constellation diagram (first 250 symbols)
+        % Constellation diagram
         if snr_db < 10
             fig = figure;
             scatter(I_samples(1:min(250,end)), Q_samples(1:min(250,end)), 'filled');
@@ -121,6 +123,47 @@ end
             close(fig);
         end
     end
+end
+
+%% Step 6.5: Constellation Plot for SNR = ∞ dB (no noise)
+for p_idx = 1:2
+    pulse = pulse_shapes{p_idx};
+    pulse_energy = sum(pulse.^2);
+
+    % Pulse shaping
+    I_upsampled = upsample(I, samples_per_symbol);
+    Q_upsampled = upsample(Q, samples_per_symbol);
+    I_shaped = conv(I_upsampled, pulse, 'same');
+    Q_shaped = conv(Q_upsampled, pulse, 'same');
+
+    % Carrier modulation
+    t = (0:length(I_shaped)-1) * Ts;
+    tx_signal = I_shaped .* cos(2*pi*fc*t) - Q_shaped .* sin(2*pi*fc*t);
+
+    % No noise
+    rx_signal = tx_signal;
+
+    % Down-conversion
+    I_rx = rx_signal .* cos(2*pi*fc*t);
+    Q_rx = -rx_signal .* sin(2*pi*fc*t);
+
+    % Matched filter
+    I_filtered = conv(I_rx, fliplr(pulse), 'same');
+    Q_filtered = conv(Q_rx, fliplr(pulse), 'same');
+
+    % Sample
+    sample_indices = samples_per_symbol:samples_per_symbol:length(I_filtered);
+    I_samples = I_filtered(sample_indices);
+    Q_samples = Q_filtered(sample_indices);
+
+    % Plot constellation
+    fig = figure;
+    scatter(I_samples(1:min(250,end)), Q_samples(1:min(250,end)), 'filled');
+    title(sprintf('Constellation (%s pulse, SNR = ∞ dB)', pulse_names{p_idx}));
+    xlabel('I'); ylabel('Q'); axis equal; grid on;
+    drawnow; pause(0.1);
+    saveas(fig, sprintf('constellation_%s_snrInf.jpg', lower(pulse_names{p_idx})));
+    close(fig);
 end
 
 %% Step 7: BER Plot
